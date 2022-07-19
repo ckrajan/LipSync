@@ -1,0 +1,5 @@
+movie: "youth"
+input_video: "/home/chathushkavi/Downloads/youth_input.mp4"
+output_video: "/home/chathushkavi/Downloads/youth.mp4"
+input_scenes: {scene1: {"start": 0, "end": 11}, scene2: {"start": 12, "end": 13}, scene3: {"start": 14, "end": 24}}
+output_scenes: {scene1: {"start": 0, "end": 11}, scene2: {"start": 12, "end": 13}, scene3: {"start": 14, "end": 24}}
