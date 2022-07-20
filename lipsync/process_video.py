@@ -12,14 +12,16 @@ from moviepy.editor import *
 
 detector = mp.solutions.face_mesh.FaceMesh(
 max_num_faces=1,
-refine_landmarks=False,
+refine_landmarks=True,
 min_detection_confidence=0.5,
 min_tracking_confidence=0.5
 )
 
 arr_mouthPoints = []
 arr_timepoints =[]
-frame_no = 500
+frame_no = 20
+arr_outer_mouth = []
+arr_inner_mouth = []
 
 yaml = YAML(typ="safe")
 with open("config.yml") as f:
@@ -35,6 +37,7 @@ def frame_collect(video,scenes,vid_type):
         scene_no = i
         os.mkdir("/home/chathushkavi/%s/%s/%s" % (movie_name,vid_type,i))
         os.mkdir("/home/chathushkavi/%s/%s/%s/%s" % (movie_name,vid_type,i,scene_no))
+        os.mkdir("/home/chathushkavi/%s/%s/%s/%s" % (movie_name,vid_type,i,"facemesh"))
 
         scene_values = scenes[i]
         start_time = scene_values['start']
@@ -59,56 +62,115 @@ def frame_collect(video,scenes,vid_type):
         print("Total frames: {}".format(approx_frame_count))
         print("FPS :",fps)
         running = True
-        frame_counter = 0
+        frame_counter = 1
         baseTime = 0.1
 
         # out = cv2.VideoWriter("/home/chathushkavi/Downloads/output.mp4", fourcc, fps, (cap_width, cap_height))
 
         while running:
             ret, frame = cap.read()
-            frame_result = process_frame(frame)
-            keypoints = frame_result.multi_face_landmarks
+            if frame is not None:
+                frame_result = process_frame(frame)
+                keypoints = frame_result.multi_face_landmarks
 
-            if(keypoints != None):
-                ls_single_face=keypoints[0].landmark        
+                if(keypoints != None):
+                    ls_single_face=keypoints[0].landmark        
 
-                mouthPoints = [78, 191, 80, 81, 82, 13, 312, 311, 310, 415, 308, 324, 318, 402, 317, 14, 87, 178, 88, 95]
+                    mouthPoints = [78, 191, 80, 81, 82, 13, 312, 311, 310, 415, 308, 324, 318, 402, 317, 14, 87, 178, 88, 95]
 
-                for i in range(len(mouthPoints)):
-                    test = [(ls_single_face[mouthPoints[i]].x), (ls_single_face[mouthPoints[i]].y)]
-                    arr_mouthPoints.append(test)
+                    for i in range(len(mouthPoints)):
+                        test = [(ls_single_face[mouthPoints[i]].x), (ls_single_face[mouthPoints[i]].y)]
+                        arr_mouthPoints.append(test)
 
-                points_str = str(arr_mouthPoints)
+                    points_str = str(arr_mouthPoints)
 
-                arr_format = [round(baseTime, 1), points_str]
-                arr_timepoints.append(arr_format)
-                arr_mouthPoints.clear()
-                res_string = str(arr_timepoints)[1:-1]
-                res_list = ast.literal_eval(res_string)
+                    arr_format = [round(baseTime, 1), points_str]
+                    arr_timepoints.append(arr_format)
+                    # arr_mouthPoints.clear()
+                    res_string = str(arr_timepoints)[1:-1]
+                    res_list = ast.literal_eval(res_string)
 
-                # with open('/home/chathushkavi/Downloadslipsync/target.json', 'a') as f:
-                #     if frame_counter == 0:
-                #         f.write('[')
-                #     json.dump(res_list, f)
-                #     if frame_counter != frame_no:
-                #         f.write(',')
-                #     else:
-                #         f.write(']')
+                    # with open('/home/chathushkavi/Downloadslipsync/target.json', 'a') as f:
+                    #     if frame_counter == 0:
+                    #         f.write('[')
+                    #     json.dump(res_list, f)
+                    #     if frame_counter != frame_no:
+                    #         f.write(',')
+                    #     else:
+                    #         f.write(']')
 
-                arr_timepoints.clear()
+                    arr_timepoints.clear()
 
-                baseTime = baseTime + 0.1
+                    baseTime = baseTime + 0.1
 
-                frame_counter = frame_counter + 1
+                    # frame_counter = frame_counter + 1
 
-                # cv2 save frame as image                
-                name = "frame%d.jpg"%frame_counter
-                cv2.imwrite(os.path.join("/home/chathushkavi/%s/%s/%s" % (movie_name,vid_type,scene_no) , name), frame)
+                    # cv2 save frame as image                
+                    name = "frame%d.jpg"%frame_counter
+                    cv2.imwrite(os.path.join("/home/chathushkavi/%s/%s/%s" % (movie_name,vid_type,scene_no) , name), frame)
+                    # image = cv2.imread(os.path.join("/home/chathushkavi/%s/%s/%s" % (movie_name,vid_type,scene_no) , name))
+                    # rgb_image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+                    # result = process_frame(rgb_image)
 
-                # out.write(frame)
-            
+                    outer_pts = [61, 185, 40, 39, 37, 0, 267, 269, 270, 409, 291, 375, 321, 405, 314, 17, 84, 181, 91, 146]
+                    inner_pts = [78, 191, 80, 81, 82, 13, 312, 311, 310, 415, 308, 324, 318, 402, 317, 14, 87, 178, 88, 95]
+
+                    height, width, _ = frame.shape
+                    for i in outer_pts:
+                        pt1 = ls_single_face[i]
+                        x = int(pt1.x * width)
+                        y = int(pt1.y * height)
+
+                        outer_coordinates = [x, y]
+                        arr_outer_mouth.append(outer_coordinates)
+                        
+                        cv2.circle(frame, (x, y), 1, (255, 0, 0), -1)
+                    
+                    # new points for polygon
+                    # create and reshape array
+                    arr_outer_mouth1 = np.array(arr_outer_mouth)
+                    arr_outer_mouth1 = arr_outer_mouth1.reshape((-1, 1, 2))
+
+                    # Attributes
+                    isClosed = True
+                    color = (255, 0, 0)
+                    thickness = 2
+
+                    # draw closed polyline
+                    cv2.polylines(frame, [arr_outer_mouth1], isClosed, color, thickness)
+
+                    for i in inner_pts:
+                        pt1 = ls_single_face[i]
+                        x = int(pt1.x * width)
+                        y = int(pt1.y * height)
+
+                        inner_coordinates = [x, y]
+                        arr_inner_mouth.append(inner_coordinates)
+                        
+                        cv2.circle(frame, (x, y), 1, (255, 0, 0), -1)
+                    
+                    # new points for polygon
+                    # create and reshape array
+                    arr_inner_mouth1 = np.array(arr_inner_mouth)
+                    arr_inner_mouth1 = arr_inner_mouth1.reshape((-1, 1, 2))
+
+                    # Attributes
+                    isClosed = True
+                    color = (255, 0, 0)
+                    thickness = 2
+
+                    # draw closed polyline
+                    cv2.polylines(frame, [arr_inner_mouth1], isClosed, color, thickness)
+
+                    cv2.imwrite("/home/chathushkavi/%s/%s/%s/%s/%s" % (movie_name,vid_type,scene_no,"facemesh","frame%d.jpg"%frame_counter), frame)
+
+                    arr_outer_mouth.clear()
+                    arr_inner_mouth.clear()
+
+                    # out.write(frame)
+
+            frame_counter = frame_counter + 1   
             if(frame_counter > approx_frame_count_x):
-                print(frame_counter,approx_frame_count_x)
                 running = False
                 # out.release()
                 # raise RuntimeError("No frame received")
