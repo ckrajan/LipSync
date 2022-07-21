@@ -9,6 +9,7 @@ import os
 from moviepy.editor import *
 
 # cap = None
+mp_drawing = mp.solutions.drawing_utils
 
 detector = mp.solutions.face_mesh.FaceMesh(
 max_num_faces=1,
@@ -17,9 +18,12 @@ min_detection_confidence=0.5,
 min_tracking_confidence=0.5
 )
 
+mp_face_detection = mp.solutions.face_detection.FaceDetection(
+    model_selection=1, min_detection_confidence=0.5)
+
 arr_mouthPoints = []
 arr_timepoints =[]
-frame_no = 20
+frame_no = 10
 arr_outer_mouth = []
 arr_inner_mouth = []
 
@@ -33,11 +37,11 @@ def frame_collect(video,scenes,vid_type):
     clip = VideoFileClip(video)
 
     for i in scenes:
-        # scene_path = "/home/chathushkavi/%s/%s/%s" % (movie_name,"output",i)
         scene_no = i
         os.mkdir("/home/chathushkavi/%s/%s/%s" % (movie_name,vid_type,i))
         os.mkdir("/home/chathushkavi/%s/%s/%s/%s" % (movie_name,vid_type,i,scene_no))
         os.mkdir("/home/chathushkavi/%s/%s/%s/%s" % (movie_name,vid_type,i,"facemesh"))
+        os.mkdir("/home/chathushkavi/%s/%s/%s/%s" % (movie_name,vid_type,i,"failed"))
 
         scene_values = scenes[i]
         start_time = scene_values['start']
@@ -69,11 +73,13 @@ def frame_collect(video,scenes,vid_type):
 
         while running:
             ret, frame = cap.read()
+            # cv2.imshow("window",frame)
+            # cv2.waitKey(1000)
             if frame is not None:
                 frame_result = process_frame(frame)
                 keypoints = frame_result.multi_face_landmarks
 
-                if(keypoints != None):
+                if(keypoints is not None):
                     ls_single_face=keypoints[0].landmark        
 
                     mouthPoints = [78, 191, 80, 81, 82, 13, 312, 311, 310, 415, 308, 324, 318, 402, 317, 14, 87, 178, 88, 95]
@@ -102,8 +108,6 @@ def frame_collect(video,scenes,vid_type):
                     arr_timepoints.clear()
 
                     baseTime = baseTime + 0.1
-
-                    # frame_counter = frame_counter + 1
 
                     # cv2 save frame as image                
                     name = "frame%d.jpg"%frame_counter
@@ -162,12 +166,44 @@ def frame_collect(video,scenes,vid_type):
                     # draw closed polyline
                     cv2.polylines(frame, [arr_inner_mouth1], isClosed, color, thickness)
 
+                   
+                    if not  mp_face_detection.process(frame).detections:
+                        print('No faces detected.')
+                    else:
+                        for detection in  mp_face_detection.process(frame).detections: # iterate over each detection and draw on image
+                            # print("detection: ",detection)
+                            mp_drawing.draw_detection(frame, detection)
+
                     cv2.imwrite("/home/chathushkavi/%s/%s/%s/%s/%s" % (movie_name,vid_type,scene_no,"facemesh","frame%d.jpg"%frame_counter), frame)
 
                     arr_outer_mouth.clear()
                     arr_inner_mouth.clear()
 
                     # out.write(frame)
+
+                else:
+                    cv2.imwrite("/home/chathushkavi/%s/%s/%s/%s/%s" % (movie_name,vid_type,scene_no,"failed","frame%d.jpg"%frame_counter), frame)
+                    image = cv2.imread(os.path.join("/home/chathushkavi/%s/%s/%s/%s" % (movie_name,vid_type,scene_no,"failed") , "frame%d.jpg"%frame_counter))
+                    image_input = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+
+                    results = mp_face_detection.process(image_input)
+
+                    if not results.detections:
+                        print('No faces detected.')
+                    else:
+                        height, width, _ = image.shape
+                        for detection in results.detections: # iterate over each detection and draw on image
+                            mp_drawing.draw_detection(image, detection)
+                            bbox = detection.location_data.relative_bounding_box
+                            bbox_points = {
+                                "xmin" : int(bbox.xmin * width),
+                                "ymin" : int(bbox.ymin * height),
+                                "xmax" : int(bbox.width * width + bbox.xmin * width),
+                                "ymax" : int(bbox.height * height + bbox.ymin * height)
+                            }
+                        cropped_image = image[bbox_points["ymin"]:bbox_points["ymax"], bbox_points["xmin"]:bbox_points["xmax"]]
+
+                        cv2.imwrite("/home/chathushkavi/%s/%s/%s/%s/%s" % (movie_name,vid_type,scene_no,"facemesh","frame%d.jpg"%frame_counter), cropped_image)
 
             frame_counter = frame_counter + 1   
             if(frame_counter > approx_frame_count_x):
@@ -176,6 +212,7 @@ def frame_collect(video,scenes,vid_type):
                 # raise RuntimeError("No frame received")
 
 def run():
+
     try:
         os.mkdir("/home/chathushkavi/%s"%movie_name)
         # os.mkdir("/home/chathushkavi/%s/%s" % (movie_name,"input"))
@@ -191,6 +228,7 @@ def run():
 
     # frame_collect(input_video,input_scenes,"input")
     frame_collect(output_video,output_scenes,"output")    
+     
 
 def stop():
     """Stop loop and release camera.
