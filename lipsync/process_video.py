@@ -24,8 +24,10 @@ mp_face_detection = mp.solutions.face_detection.FaceDetection(
 arr_mouthPoints = []
 arr_timepoints =[]
 frame_no = 10
-arr_outer_mouth = []
-arr_inner_mouth = []
+arr_mouth = []
+
+outer_pts = [61, 185, 40, 39, 37, 0, 267, 269, 270, 409, 291, 375, 321, 405, 314, 17, 84, 181, 91, 146]
+inner_pts = [78, 191, 80, 81, 82, 13, 312, 311, 310, 415, 308, 324, 318, 402, 317, 14, 87, 178, 88, 95]
 
 yaml = YAML(typ="safe")
 with open("config.yml") as f:
@@ -80,7 +82,7 @@ def frame_collect(video,scenes,vid_type):
                 keypoints = frame_result.multi_face_landmarks
 
                 if(keypoints is not None):
-                    ls_single_face=keypoints[0].landmark        
+                    ls_single_face=keypoints[0].landmark 
 
                     mouthPoints = [78, 191, 80, 81, 82, 13, 312, 311, 310, 415, 308, 324, 318, 402, 317, 14, 87, 178, 88, 95]
 
@@ -92,7 +94,7 @@ def frame_collect(video,scenes,vid_type):
 
                     arr_format = [round(baseTime, 1), points_str]
                     arr_timepoints.append(arr_format)
-                    # arr_mouthPoints.clear()
+                    arr_mouthPoints.clear()
                     res_string = str(arr_timepoints)[1:-1]
                     res_list = ast.literal_eval(res_string)
 
@@ -116,59 +118,13 @@ def frame_collect(video,scenes,vid_type):
                     # rgb_image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
                     # result = process_frame(rgb_image)
 
-                    outer_pts = [61, 185, 40, 39, 37, 0, 267, 269, 270, 409, 291, 375, 321, 405, 314, 17, 84, 181, 91, 146]
-                    inner_pts = [78, 191, 80, 81, 82, 13, 312, 311, 310, 415, 308, 324, 318, 402, 317, 14, 87, 178, 88, 95]
-
                     height, width, _ = frame.shape
-                    for i in outer_pts:
-                        pt1 = ls_single_face[i]
-                        x = int(pt1.x * width)
-                        y = int(pt1.y * height)
 
-                        outer_coordinates = [x, y]
-                        arr_outer_mouth.append(outer_coordinates)
-                        
-                        cv2.circle(frame, (x, y), 1, (255, 0, 0), -1)
-                    
-                    # new points for polygon
-                    # create and reshape array
-                    arr_outer_mouth1 = np.array(arr_outer_mouth)
-                    arr_outer_mouth1 = arr_outer_mouth1.reshape((-1, 1, 2))
+                    drawlips(frame,outer_pts,ls_single_face,height, width)
+                    drawlips(frame,inner_pts,ls_single_face,height, width)
 
-                    # Attributes
-                    isClosed = True
-                    color = (255, 0, 0)
-                    thickness = 2
-
-                    # draw closed polyline
-                    cv2.polylines(frame, [arr_outer_mouth1], isClosed, color, thickness)
-
-                    for i in inner_pts:
-                        pt1 = ls_single_face[i]
-                        x = int(pt1.x * width)
-                        y = int(pt1.y * height)
-
-                        inner_coordinates = [x, y]
-                        arr_inner_mouth.append(inner_coordinates)
-                        
-                        cv2.circle(frame, (x, y), 1, (255, 0, 0), -1)
-                    
-                    # new points for polygon
-                    # create and reshape array
-                    arr_inner_mouth1 = np.array(arr_inner_mouth)
-                    arr_inner_mouth1 = arr_inner_mouth1.reshape((-1, 1, 2))
-
-                    # Attributes
-                    isClosed = True
-                    color = (255, 0, 0)
-                    thickness = 2
-
-                    # draw closed polyline
-                    cv2.polylines(frame, [arr_inner_mouth1], isClosed, color, thickness)
-
-                   
-                    if not  mp_face_detection.process(frame).detections:
-                        print('No faces detected.')
+                    if not mp_face_detection.process(frame).detections:
+                        print('No faces detected1.',frame_counter)
                     else:
                         for detection in  mp_face_detection.process(frame).detections: # iterate over each detection and draw on image
                             # print("detection: ",detection)
@@ -176,12 +132,10 @@ def frame_collect(video,scenes,vid_type):
 
                     cv2.imwrite("/home/chathushkavi/%s/%s/%s/%s/%s" % (movie_name,vid_type,scene_no,"facemesh","frame%d.jpg"%frame_counter), frame)
 
-                    arr_outer_mouth.clear()
-                    arr_inner_mouth.clear()
-
                     # out.write(frame)
 
                 else:
+                    face_cnt = 0
                     cv2.imwrite("/home/chathushkavi/%s/%s/%s/%s/%s" % (movie_name,vid_type,scene_no,"failed","frame%d.jpg"%frame_counter), frame)
                     image = cv2.imread(os.path.join("/home/chathushkavi/%s/%s/%s/%s" % (movie_name,vid_type,scene_no,"failed") , "frame%d.jpg"%frame_counter))
                     image_input = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
@@ -189,7 +143,7 @@ def frame_collect(video,scenes,vid_type):
                     results = mp_face_detection.process(image_input)
 
                     if not results.detections:
-                        print('No faces detected.')
+                        print('No faces detected2.',frame_counter)
                     else:
                         height, width, _ = image.shape
                         for detection in results.detections: # iterate over each detection and draw on image
@@ -201,18 +155,30 @@ def frame_collect(video,scenes,vid_type):
                                 "xmax" : int(bbox.width * width + bbox.xmin * width),
                                 "ymax" : int(bbox.height * height + bbox.ymin * height)
                             }
-                        cropped_image = image[bbox_points["ymin"]:bbox_points["ymax"], bbox_points["xmin"]:bbox_points["xmax"]]
+                            cropped_image = image[bbox_points["ymin"]:bbox_points["ymax"], bbox_points["xmin"]:bbox_points["xmax"]]
 
-                        cv2.imwrite("/home/chathushkavi/%s/%s/%s/%s/%s" % (movie_name,vid_type,scene_no,"facemesh","frame%d.jpg"%frame_counter), cropped_image)
+                            face_cnt = face_cnt + 1
+
+                            height_crop, width_crop, _ = cropped_image.shape
+
+                            frame_result1 = process_frame(cropped_image)
+                            keypoints1 = frame_result1.multi_face_landmarks
+                            if(keypoints1 is not None):
+                                ls_single_face1=keypoints1[0].landmark  
+
+                                drawlips(cropped_image,outer_pts,ls_single_face1,height_crop, width_crop)
+                                drawlips(cropped_image,inner_pts,ls_single_face1,height_crop, width_crop)
+
+                                cv2.imwrite("/home/chathushkavi/%s/%s/%s/%s/%s" % (movie_name,vid_type,scene_no,"facemesh","frame%d_%d.jpg"%(frame_counter,face_cnt)), cropped_image)
 
             frame_counter = frame_counter + 1   
             if(frame_counter > approx_frame_count_x):
+            # if(frame_counter > frame_no):  
                 running = False
                 # out.release()
                 # raise RuntimeError("No frame received")
 
 def run():
-
     try:
         os.mkdir("/home/chathushkavi/%s"%movie_name)
         # os.mkdir("/home/chathushkavi/%s/%s" % (movie_name,"input"))
@@ -227,8 +193,8 @@ def run():
     output_scenes = config['output_scenes']
 
     # frame_collect(input_video,input_scenes,"input")
-    frame_collect(output_video,output_scenes,"output")    
-     
+    frame_collect(output_video,output_scenes,"output")   
+
 
 def stop():
     """Stop loop and release camera.
@@ -244,6 +210,32 @@ def process_frame(frame):
         
     except Exception as e:
         print(e)
+
+def drawlips(frame,pts,ls_single_face,height, width):
+    for i in pts:
+        pt1 = ls_single_face[i]
+        x = int(pt1.x * width)
+        y = int(pt1.y * height)
+
+        coordinates = [x, y]
+        arr_mouth.append(coordinates)
+        
+        cv2.circle(frame, (x, y), 1, (255, 0, 0), -1)
+    
+    # new points for polygon
+    # create and reshape array
+    arr_mouth1 = np.array(arr_mouth)
+    arr_mouth1 = arr_mouth1.reshape((-1, 1, 2))
+
+    # Attributes
+    isClosed = True
+    color = (255, 0, 0)
+    thickness = 2
+
+    # draw closed polyline
+    cv2.polylines(frame, [arr_mouth1], isClosed, color, thickness)
+
+    arr_mouth.clear()
 
 if __name__ == '__main__':
     run()
