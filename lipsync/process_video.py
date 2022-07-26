@@ -12,7 +12,7 @@ from moviepy.editor import *
 mp_drawing = mp.solutions.drawing_utils
 
 detector = mp.solutions.face_mesh.FaceMesh(
-max_num_faces=1,
+max_num_faces=10,
 refine_landmarks=True,
 min_detection_confidence=0.5,
 min_tracking_confidence=0.5
@@ -71,7 +71,7 @@ def frame_collect(video,scenes,vid_type):
         frame_counter = 1
         baseTime = 0.1
 
-        # out = cv2.VideoWriter("/home/chathushkavi/Downloads/output.mp4", fourcc, fps, (cap_width, cap_height))
+        out = cv2.VideoWriter("/home/chathushkavi/Downloads/output_" + scene_no + ".mp4", fourcc, fps, (cap_width, cap_height))
 
         while running:
             ret, frame = cap.read()
@@ -120,19 +120,43 @@ def frame_collect(video,scenes,vid_type):
 
                     height, width, _ = frame.shape
 
-                    drawlips(frame,outer_pts,ls_single_face,height, width)
-                    drawlips(frame,inner_pts,ls_single_face,height, width)
-
                     if not mp_face_detection.process(frame).detections:
                         print('No faces detected1.',frame_counter)
+                        drawlips(frame,outer_pts,ls_single_face,height, width)
+                        drawlips(frame,inner_pts,ls_single_face,height, width)
+                        cv2.imwrite("/home/chathushkavi/%s/%s/%s/%s/%s" % (movie_name,vid_type,scene_no,"facemesh","frame%d.jpg"%frame_counter), frame)
+
                     else:
+                        face_count = 0
                         for detection in  mp_face_detection.process(frame).detections: # iterate over each detection and draw on image
                             # print("detection: ",detection)
-                            mp_drawing.draw_detection(frame, detection)
+                            # mp_drawing.draw_detection(frame, detection)
+                            face_count = face_count + 1
+                            bbox = detection.location_data.relative_bounding_box
+                            bbox_points = {
+                            "xmin" : int(bbox.xmin * width),
+                            "ymin" : int(bbox.ymin * height),
+                            "xmax" : int(bbox.width * width + bbox.xmin * width),
+                            "ymax" : int(bbox.height * height + bbox.ymin * height)
+                            }
+                            cropped_image = frame[bbox_points["ymin"]:bbox_points["ymax"], bbox_points["xmin"]:bbox_points["xmax"]]
 
-                    cv2.imwrite("/home/chathushkavi/%s/%s/%s/%s/%s" % (movie_name,vid_type,scene_no,"facemesh","frame%d.jpg"%frame_counter), frame)
+                            height_crop, width_crop, _ = cropped_image.shape
 
-                    # out.write(frame)
+                            frame_result1 = process_frame(cropped_image)
+                            keypoints1 = frame_result1.multi_face_landmarks
+                            if(keypoints1 is not None):
+                                ls_single_face1=keypoints1[0].landmark  
+
+                                drawlips(cropped_image,outer_pts,ls_single_face1,height_crop, width_crop)
+                                drawlips(cropped_image,inner_pts,ls_single_face1,height_crop, width_crop)
+
+                                # To save individual faces in successfully processed single frame
+                                # cv2.imwrite("/home/chathushkavi/%s/%s/%s/%s/%s" % (movie_name,vid_type,scene_no,"facemesh","frame%d_%d.jpg"%(frame_counter,face_count)), cropped_image)
+
+                        cv2.imwrite("/home/chathushkavi/%s/%s/%s/%s/%s" % (movie_name,vid_type,scene_no,"facemesh","frame%d.jpg"%frame_counter), frame)
+
+                    out.write(frame)
 
                 else:
                     face_cnt = 0
@@ -147,7 +171,7 @@ def frame_collect(video,scenes,vid_type):
                     else:
                         height, width, _ = image.shape
                         for detection in results.detections: # iterate over each detection and draw on image
-                            mp_drawing.draw_detection(image, detection)
+                            # mp_drawing.draw_detection(image, detection)
                             bbox = detection.location_data.relative_bounding_box
                             bbox_points = {
                                 "xmin" : int(bbox.xmin * width),
@@ -160,7 +184,7 @@ def frame_collect(video,scenes,vid_type):
                             face_cnt = face_cnt + 1
 
                             height_crop, width_crop, _ = cropped_image.shape
-
+                            
                             frame_result1 = process_frame(cropped_image)
                             keypoints1 = frame_result1.multi_face_landmarks
                             if(keypoints1 is not None):
@@ -169,13 +193,17 @@ def frame_collect(video,scenes,vid_type):
                                 drawlips(cropped_image,outer_pts,ls_single_face1,height_crop, width_crop)
                                 drawlips(cropped_image,inner_pts,ls_single_face1,height_crop, width_crop)
 
-                                cv2.imwrite("/home/chathushkavi/%s/%s/%s/%s/%s" % (movie_name,vid_type,scene_no,"facemesh","frame%d_%d.jpg"%(frame_counter,face_cnt)), cropped_image)
+                                image[bbox_points["ymin"]:bbox_points["ymax"], bbox_points["xmin"]:bbox_points["xmax"]] = cropped_image
+
+                        cv2.imwrite("/home/chathushkavi/%s/%s/%s/%s/%s" % (movie_name,vid_type,scene_no,"facemesh","frame%d.jpg"%(frame_counter)), image)
+
+                    out.write(image)
 
             frame_counter = frame_counter + 1   
             if(frame_counter > approx_frame_count_x):
             # if(frame_counter > frame_no):  
                 running = False
-                # out.release()
+                out.release()
                 # raise RuntimeError("No frame received")
 
 def run():
@@ -194,6 +222,7 @@ def run():
 
     # frame_collect(input_video,input_scenes,"input")
     frame_collect(output_video,output_scenes,"output")   
+
 
 
 def stop():
