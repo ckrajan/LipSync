@@ -287,3 +287,4 @@ def drawlips(frame,pts,ls_single_face,height, width):
 
 if __name__ == '__main__':
     run()
+    merge_audio_video()
