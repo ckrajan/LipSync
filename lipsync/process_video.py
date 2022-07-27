@@ -51,6 +51,8 @@ def frame_collect(video,scenes,vid_type):
 
         clip_x = clip.subclip(start_time, end_time)
         clip_x.write_videofile("/home/chathushkavi/%s/%s/%s/%s" % (movie_name,vid_type,i,scene_no) + '/' + i + ".mp4")
+
+        clip_x.audio.write_audiofile("/home/chathushkavi/Downloads/output_" + scene_no + "_audio.mp3")
     
         """Start loop in thread capturing incoming frames.
         """
@@ -221,9 +223,26 @@ def run():
     output_scenes = config['output_scenes']
 
     # frame_collect(input_video,input_scenes,"input")
-    frame_collect(output_video,output_scenes,"output")   
+    frame_collect(output_video,output_scenes,"output")
 
+def merge_audio_video():
+    audioclip1 = AudioFileClip("/home/chathushkavi/Downloads/output_scene1_audio.mp3")
+    audioclip2 = AudioFileClip("/home/chathushkavi/Downloads/output_scene2_audio.mp3")
+    audioclip3 = AudioFileClip("/home/chathushkavi/Downloads/output_scene3_audio.mp3")
+    audioclip4 = AudioFileClip("/home/chathushkavi/Downloads/output_scene4_audio.mp3")
 
+    clip_1 = VideoFileClip("/home/chathushkavi/Downloads/output_scene1.mp4")
+    clip_2 = VideoFileClip("/home/chathushkavi/Downloads/output_scene2.mp4")
+    clip_3 = VideoFileClip("/home/chathushkavi/Downloads/output_scene3.mp4")
+    clip_4 = VideoFileClip("/home/chathushkavi/Downloads/output_scene4.mp4")
+
+    final_clip = concatenate_videoclips([clip_1,clip_2,clip_3,clip_4])
+    final_clip_audio = concatenate_audioclips([audioclip1,audioclip2,audioclip3,audioclip4])
+    final_clip_audio.write_audiofile("/home/chathushkavi/Downloads/final_mahesh.mp3")
+
+    new_audioclip = CompositeAudioClip([final_clip_audio])
+    final_clip.audio = new_audioclip
+    final_clip.write_videofile("/home/chathushkavi/Downloads/final_mahesh.mp4")
 
 def stop():
     """Stop loop and release camera.
