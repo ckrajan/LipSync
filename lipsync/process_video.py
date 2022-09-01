@@ -7,8 +7,8 @@ import ast
 from ruamel.yaml import YAML
 import os
 from moviepy.editor import *
+import ast
 
-# cap = None
 mp_drawing = mp.solutions.drawing_utils
 
 detector = mp.solutions.face_mesh.FaceMesh(
@@ -21,10 +21,9 @@ min_tracking_confidence=0.5
 mp_face_detection = mp.solutions.face_detection.FaceDetection(
     model_selection=1, min_detection_confidence=0.5)
 
-arr_mouthPoints = []
-arr_timepoints =[]
 frame_no = 10
 arr_mouth = []
+frame_counter = 1
 
 outer_pts = [61, 185, 40, 39, 37, 0, 267, 269, 270, 409, 291, 375, 321, 405, 314, 17, 84, 181, 91, 146]
 inner_pts = [78, 191, 80, 81, 82, 13, 312, 311, 310, 415, 308, 324, 318, 402, 317, 14, 87, 178, 88, 95]
@@ -34,6 +33,7 @@ with open("config.yml") as f:
     config = yaml.load(f)
 
 movie_name = config["movie"]
+vid_type = "output"
 
 def frame_collect(video,scenes,vid_type):
     clip = VideoFileClip(video)
@@ -43,16 +43,17 @@ def frame_collect(video,scenes,vid_type):
         os.mkdir("/home/chathushkavi/%s/%s/%s" % (movie_name,vid_type,i))
         os.mkdir("/home/chathushkavi/%s/%s/%s/%s" % (movie_name,vid_type,i,scene_no))
         os.mkdir("/home/chathushkavi/%s/%s/%s/%s" % (movie_name,vid_type,i,"facemesh"))
-        os.mkdir("/home/chathushkavi/%s/%s/%s/%s" % (movie_name,vid_type,i,"failed"))
+        os.mkdir("/home/chathushkavi/%s/%s/%s/%s" % (movie_name,vid_type,i,"detected_face"))
+        os.mkdir("/home/chathushkavi/%s/%s/%s/%s" % (movie_name,vid_type,i,"output_scene"))
 
         scene_values = scenes[i]
         start_time = scene_values['start']
         end_time = scene_values['end']
 
         clip_x = clip.subclip(start_time, end_time)
-        clip_x.write_videofile("/home/chathushkavi/%s/%s/%s/%s" % (movie_name,vid_type,i,scene_no) + '/' + i + ".mp4")
+        clip_x.write_videofile("/home/chathushkavi/%s/%s/%s/%s" % (movie_name,vid_type,i,scene_no) + '/' + i + ".mp4", fps=30)
 
-        clip_x.audio.write_audiofile("/home/chathushkavi/Downloads/output_" + scene_no + "_audio.mp3")
+        # clip_x.audio.write_audiofile("/home/chathushkavi/%s/%s/%s/%s" % (movie_name,vid_type,i,"output_scene") + '/output_' + i + "_audio.mp3")
     
         """Start loop in thread capturing incoming frames.
         """
@@ -73,133 +74,62 @@ def frame_collect(video,scenes,vid_type):
         frame_counter = 1
         baseTime = 0.1
 
-        out = cv2.VideoWriter("/home/chathushkavi/Downloads/output_" + scene_no + ".mp4", fourcc, fps, (cap_width, cap_height))
+        out = cv2.VideoWriter("/home/chathushkavi/%s/%s/%s/%s"% (movie_name,vid_type,i,"output_scene") + '/output_' + i + "_video.mp4", fourcc, fps, (cap_width, cap_height))
 
         while running:
             ret, frame = cap.read()
-            # cv2.imshow("window",frame)
-            # cv2.waitKey(1000)
             if frame is not None:
-                frame_result = process_frame(frame)
-                keypoints = frame_result.multi_face_landmarks
 
-                if(keypoints is not None):
-                    ls_single_face=keypoints[0].landmark 
+                face_cnt = 0
+                cv2.imwrite("/home/chathushkavi/%s/%s/%s/%s/%s" % (movie_name,vid_type,scene_no,"detected_face","frame%d.jpg"%frame_counter), frame)
+                image = cv2.imread(os.path.join("/home/chathushkavi/%s/%s/%s/%s" % (movie_name,vid_type,scene_no,"detected_face") , "frame%d.jpg"%frame_counter))
+                image_input = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
 
-                    mouthPoints = [78, 191, 80, 81, 82, 13, 312, 311, 310, 415, 308, 324, 318, 402, 317, 14, 87, 178, 88, 95]
+                results = mp_face_detection.process(image_input)
 
-                    for i in range(len(mouthPoints)):
-                        test = [(ls_single_face[mouthPoints[i]].x), (ls_single_face[mouthPoints[i]].y)]
-                        arr_mouthPoints.append(test)
+                if not results.detections:
+                    print('No faces detected',frame_counter)
 
-                    points_str = str(arr_mouthPoints)
+                    frame_result = process_frame(frame)
+                    keypoints = frame_result.multi_face_landmarks
 
-                    arr_format = [round(baseTime, 1), points_str]
-                    arr_timepoints.append(arr_format)
-                    arr_mouthPoints.clear()
-                    res_string = str(arr_timepoints)[1:-1]
-                    res_list = ast.literal_eval(res_string)
+                    if(keypoints is not None):
+                        ls_single_face=keypoints[0].landmark 
 
-                    # with open('/home/chathushkavi/Downloadslipsync/target.json', 'a') as f:
-                    #     if frame_counter == 0:
-                    #         f.write('[')
-                    #     json.dump(res_list, f)
-                    #     if frame_counter != frame_no:
-                    #         f.write(',')
-                    #     else:
-                    #         f.write(']')
-
-                    arr_timepoints.clear()
-
-                    baseTime = baseTime + 0.1
-
-                    # cv2 save frame as image                
-                    name = "frame%d.jpg"%frame_counter
-                    cv2.imwrite(os.path.join("/home/chathushkavi/%s/%s/%s" % (movie_name,vid_type,scene_no) , name), frame)
-                    # image = cv2.imread(os.path.join("/home/chathushkavi/%s/%s/%s" % (movie_name,vid_type,scene_no) , name))
-                    # rgb_image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
-                    # result = process_frame(rgb_image)
-
-                    height, width, _ = frame.shape
-
-                    if not mp_face_detection.process(frame).detections:
-                        print('No faces detected1.',frame_counter)
                         drawlips(frame,outer_pts,ls_single_face,height, width)
                         drawlips(frame,inner_pts,ls_single_face,height, width)
                         cv2.imwrite("/home/chathushkavi/%s/%s/%s/%s/%s" % (movie_name,vid_type,scene_no,"facemesh","frame%d.jpg"%frame_counter), frame)
 
-                    else:
-                        face_count = 0
-                        for detection in  mp_face_detection.process(frame).detections: # iterate over each detection and draw on image
-                            # print("detection: ",detection)
-                            # mp_drawing.draw_detection(frame, detection)
-                            face_count = face_count + 1
-                            bbox = detection.location_data.relative_bounding_box
-                            bbox_points = {
+                else:
+                    height, width, _ = image.shape
+                    for detection in results.detections: # iterate over each detection and draw on image
+                        # mp_drawing.draw_detection(image, detection)
+                        bbox = detection.location_data.relative_bounding_box
+                        bbox_points = {
                             "xmin" : int(bbox.xmin * width),
                             "ymin" : int(bbox.ymin * height),
                             "xmax" : int(bbox.width * width + bbox.xmin * width),
                             "ymax" : int(bbox.height * height + bbox.ymin * height)
-                            }
-                            cropped_image = frame[bbox_points["ymin"]:bbox_points["ymax"], bbox_points["xmin"]:bbox_points["xmax"]]
+                        }
+                        cropped_image = image[bbox_points["ymin"]:bbox_points["ymax"], bbox_points["xmin"]:bbox_points["xmax"]]
 
-                            height_crop, width_crop, _ = cropped_image.shape
+                        face_cnt = face_cnt + 1
 
-                            frame_result1 = process_frame(cropped_image)
-                            keypoints1 = frame_result1.multi_face_landmarks
-                            if(keypoints1 is not None):
-                                ls_single_face1=keypoints1[0].landmark  
+                        height_crop, width_crop, _ = cropped_image.shape
+                        
+                        frame_result1 = process_frame(cropped_image)
+                        keypoints1 = frame_result1.multi_face_landmarks
+                        if(keypoints1 is not None):
+                            ls_single_face1=keypoints1[0].landmark  
 
-                                drawlips(cropped_image,outer_pts,ls_single_face1,height_crop, width_crop)
-                                drawlips(cropped_image,inner_pts,ls_single_face1,height_crop, width_crop)
+                            drawlips(cropped_image,outer_pts,ls_single_face1,height_crop, width_crop)
+                            drawlips(cropped_image,inner_pts,ls_single_face1,height_crop, width_crop)
 
-                                # To save individual faces in successfully processed single frame
-                                # cv2.imwrite("/home/chathushkavi/%s/%s/%s/%s/%s" % (movie_name,vid_type,scene_no,"facemesh","frame%d_%d.jpg"%(frame_counter,face_count)), cropped_image)
+                            image[bbox_points["ymin"]:bbox_points["ymax"], bbox_points["xmin"]:bbox_points["xmax"]] = cropped_image
 
-                        cv2.imwrite("/home/chathushkavi/%s/%s/%s/%s/%s" % (movie_name,vid_type,scene_no,"facemesh","frame%d.jpg"%frame_counter), frame)
+                    cv2.imwrite("/home/chathushkavi/%s/%s/%s/%s/%s" % (movie_name,vid_type,scene_no,"facemesh","frame%d.jpg"%(frame_counter)), image)
 
-                    out.write(frame)
-
-                else:
-                    face_cnt = 0
-                    cv2.imwrite("/home/chathushkavi/%s/%s/%s/%s/%s" % (movie_name,vid_type,scene_no,"failed","frame%d.jpg"%frame_counter), frame)
-                    image = cv2.imread(os.path.join("/home/chathushkavi/%s/%s/%s/%s" % (movie_name,vid_type,scene_no,"failed") , "frame%d.jpg"%frame_counter))
-                    image_input = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
-
-                    results = mp_face_detection.process(image_input)
-
-                    if not results.detections:
-                        print('No faces detected2.',frame_counter)
-                    else:
-                        height, width, _ = image.shape
-                        for detection in results.detections: # iterate over each detection and draw on image
-                            # mp_drawing.draw_detection(image, detection)
-                            bbox = detection.location_data.relative_bounding_box
-                            bbox_points = {
-                                "xmin" : int(bbox.xmin * width),
-                                "ymin" : int(bbox.ymin * height),
-                                "xmax" : int(bbox.width * width + bbox.xmin * width),
-                                "ymax" : int(bbox.height * height + bbox.ymin * height)
-                            }
-                            cropped_image = image[bbox_points["ymin"]:bbox_points["ymax"], bbox_points["xmin"]:bbox_points["xmax"]]
-
-                            face_cnt = face_cnt + 1
-
-                            height_crop, width_crop, _ = cropped_image.shape
-                            
-                            frame_result1 = process_frame(cropped_image)
-                            keypoints1 = frame_result1.multi_face_landmarks
-                            if(keypoints1 is not None):
-                                ls_single_face1=keypoints1[0].landmark  
-
-                                drawlips(cropped_image,outer_pts,ls_single_face1,height_crop, width_crop)
-                                drawlips(cropped_image,inner_pts,ls_single_face1,height_crop, width_crop)
-
-                                image[bbox_points["ymin"]:bbox_points["ymax"], bbox_points["xmin"]:bbox_points["xmax"]] = cropped_image
-
-                        cv2.imwrite("/home/chathushkavi/%s/%s/%s/%s/%s" % (movie_name,vid_type,scene_no,"facemesh","frame%d.jpg"%(frame_counter)), image)
-
-                    out.write(image)
+                out.write(image)
 
             frame_counter = frame_counter + 1   
             if(frame_counter > approx_frame_count_x):
@@ -211,38 +141,15 @@ def frame_collect(video,scenes,vid_type):
 def run():
     try:
         os.mkdir("/home/chathushkavi/%s"%movie_name)
-        # os.mkdir("/home/chathushkavi/%s/%s" % (movie_name,"input"))
-        os.mkdir("/home/chathushkavi/%s/%s" % (movie_name,"output"))
+        os.mkdir("/home/chathushkavi/%s/%s" % (movie_name,"input"))
         print ("Directory is created")
     except FileExistsError:
         print ("Directory already exists")
 
     input_video = config['input_video']
     input_scenes = config['input_scenes']
-    output_video = config['output_video']
-    output_scenes = config['output_scenes']
 
-    # frame_collect(input_video,input_scenes,"input")
-    frame_collect(output_video,output_scenes,"output")
-
-def merge_audio_video():
-    audioclip1 = AudioFileClip("/home/chathushkavi/Downloads/output_scene1_audio.mp3")
-    audioclip2 = AudioFileClip("/home/chathushkavi/Downloads/output_scene2_audio.mp3")
-    audioclip3 = AudioFileClip("/home/chathushkavi/Downloads/output_scene3_audio.mp3")
-    audioclip4 = AudioFileClip("/home/chathushkavi/Downloads/output_scene4_audio.mp3")
-
-    clip_1 = VideoFileClip("/home/chathushkavi/Downloads/output_scene1.mp4")
-    clip_2 = VideoFileClip("/home/chathushkavi/Downloads/output_scene2.mp4")
-    clip_3 = VideoFileClip("/home/chathushkavi/Downloads/output_scene3.mp4")
-    clip_4 = VideoFileClip("/home/chathushkavi/Downloads/output_scene4.mp4")
-
-    final_clip = concatenate_videoclips([clip_1,clip_2,clip_3,clip_4])
-    final_clip_audio = concatenate_audioclips([audioclip1,audioclip2,audioclip3,audioclip4])
-    final_clip_audio.write_audiofile("/home/chathushkavi/Downloads/final_mahesh.mp3")
-
-    new_audioclip = CompositeAudioClip([final_clip_audio])
-    final_clip.audio = new_audioclip
-    final_clip.write_videofile("/home/chathushkavi/Downloads/final_mahesh.mp4")
+    frame_collect(input_video,input_scenes,"input") 
 
 def stop():
     """Stop loop and release camera.
@@ -285,6 +192,6 @@ def drawlips(frame,pts,ls_single_face,height, width):
 
     arr_mouth.clear()
 
+
 if __name__ == '__main__':
     run()
-    merge_audio_video()
