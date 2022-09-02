@@ -95,7 +95,7 @@ def frame_collect(video,scenes,vid_type):
 
                     if(keypoints is not None):
                         ls_single_face=keypoints[0].landmark 
-
+                        height, width, _ = image.shape
                         drawlips(frame,outer_pts,ls_single_face,height, width)
                         drawlips(frame,inner_pts,ls_single_face,height, width)
                         cv2.imwrite("/home/chathushkavi/%s/%s/%s/%s/%s" % (movie_name,vid_type,scene_no,"facemesh","frame%d.jpg"%frame_counter), frame)
